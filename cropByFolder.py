@@ -6,8 +6,7 @@ import numpy as np
 import tensorflow as tf
 import cv2
 import time
-import matplotlib.pyplot as plt
-
+import os,sys
 
 class DetectorAPI:
     def __init__(self, path_to_ckpt):
@@ -60,14 +59,48 @@ class DetectorAPI:
         self.sess.close()
         self.default_graph.close()
 
+
+def processImage(path, odapi):
+    img = cv2.imread(path)
+    boxes, scores, classes, num = odapi.processFrame(img)
+    humanBoxes = []
+    miny,minx,channels = img.shape
+    maxy = 0
+    maxx = 0
+    for i in range(len(boxes)):
+        # Class 1 represents human
+        if classes[i] == 1 and scores[i] > threshold:
+            humanBoxes.append(boxes[i])
+            if(boxes[i][0] < miny): miny = boxes[i][0]
+            if(boxes[i][1] < minx): minx = boxes[i][1]
+            if(boxes[i][2] > maxy): maxy = boxes[i][2]
+            if(boxes[i][3] > maxx): maxx = boxes[i][3]
+    
+    cv2.imwrite('cropped/'+path, img[miny:maxy+20, minx:maxx+20])
+    print('saved cropped/'+path)
+            #cv2.rectangle(img,(box[1],box[0]),(box[3],box[2]),(255,0,0),2)
+
+
 if __name__ == "__main__":
     model_path = 'faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb'
     odapi = DetectorAPI(path_to_ckpt=model_path)
     threshold = 0.7
-    cap = cv2.VideoCapture('TownCentreXVID.avi')
-    testphoto = cv2.imread('testdata/photo2')
+    testphoto = cv2.imread('testdata/photo2.jpg')
 
-    while True:
+    count = 0
+    for root, dirs, files in os.walk(sys.argv[1]):
+        for name in files:
+            (base, ext) = os.path.splitext(name)
+            if ext in ('.jpg', '.png'):
+                count += 1
+                os.makedirs('cropped/'+root, exist_ok=True)
+                fullpath = os.path.join(root, name)
+                print('processing %s' % fullpath)
+                processImage(fullpath, odapi)
+
+    print('\ntotal number of .jpg and .png files found: %d' % count)
+
+    """while True:
         img = testphoto#cv2.resize(img, (1280, 720))
 
         boxes, scores, classes, num = odapi.processFrame(img)
@@ -83,4 +116,4 @@ if __name__ == "__main__":
         plt.show()
         key = cv2.waitKey(1)
         if key & 0xFF == ord('q'):
-            break
+            break"""
